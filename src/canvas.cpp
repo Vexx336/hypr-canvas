@@ -59,7 +59,7 @@ static void hkOnMouseWheel(CInputManager* self, IPointer::SAxisEvent e, SP<IPoin
 
             // Get raw screen coords (bypass our canvas-space hook)
             auto rawPos = (positionFn)g_pCanvas->m_positionHook->m_original;
-            const auto cursorScreen = rawPos(Pointer::g_pPointerManager);
+            const auto cursorScreen = rawPos(Pointer::CPointerManager::get());
             g_pCanvas->applyZoom(newZoom, cursorScreen);
 
             logf("[hypr-canvas] zoom=%.3f offset=(%.1f, %.1f)\n",
@@ -169,9 +169,9 @@ static PHLMONITOR hkGetMonitorFromCursor(CCompositor* self) {
 
 // --- Visibility hook ---
 
-using shouldRenderFn = bool (*)(Render::CHyprRenderer*, PHLWINDOW, PHLMONITOR);
+using shouldRenderFn = bool (*)(Render::IHyprRenderer*, PHLWINDOW, PHLMONITOR);
 
-static bool hkShouldRenderWindow(Render::CHyprRenderer* self, PHLWINDOW pWindow, PHLMONITOR pMonitor) {
+static bool hkShouldRenderWindow(Render::IHyprRenderer* self, PHLWINDOW pWindow, PHLMONITOR pMonitor) {
     auto original = (shouldRenderFn)g_pCanvas->m_shouldRenderHook->m_original;
 
     // When zoomed out, render all windows — the zoom transform will place them correctly
@@ -207,9 +207,9 @@ static CRegion hkRenderPassRender(Render::CRenderPass* self, const CRegion& dama
 
 // --- Render hook ---
 
-using renderAllClientsFn = void (*)(Render::CHyprRenderer*, PHLMONITOR, PHLWORKSPACE, const steady_tp&, const Vector2D&, const float&);
+using renderAllClientsFn = void (*)(Render::IHyprRenderer*, PHLMONITOR, PHLWORKSPACE, const steady_tp&, const Vector2D&, const float&);
 
-static void hkRenderAllClientsForWorkspace(Render::CHyprRenderer* self, PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace,
+static void hkRenderAllClientsForWorkspace(Render::IHyprRenderer* self, PHLMONITOR pMonitor, PHLWORKSPACE pWorkspace,
                                            const steady_tp& now, const Vector2D& translate, const float& scale) {
     auto original = (renderAllClientsFn)g_pCanvas->m_renderHook->m_original;
 
