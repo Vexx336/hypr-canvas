@@ -2,8 +2,8 @@
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
+#include <hyprland/src/pointer/PointerManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
-#include <hyprland/src/managers/PointerManager.hpp>
 #include <hyprland/src/managers/XWaylandManager.hpp>
 #include <hyprland/src/protocols/XDGShell.hpp>
 #include <hyprland/src/render/Renderer.hpp>
@@ -30,16 +30,16 @@ static void logf(const char* fmt, ...) {
 static void scheduleFrame() {
     auto mon = Desktop::focusState()->monitor();
     if (mon)
-        g_pCompositor->scheduleFrameForMonitor(mon);
+        mon->scheduleFrame();
 }
 
 // --- Forward typedefs ---
-using PHLMONITOR   = SP<CMonitor>;
+using PHLMONITOR   = SP<Monitor::CMonitor>;
 using PHLWORKSPACE = SP<CWorkspace>;
 using PHLWINDOW    = SP<Desktop::View::CWindow>;
 using steady_tp    = std::chrono::steady_clock::time_point;
-typedef Vector2D (*positionFn)(CPointerManager*);
-typedef PHLMONITOR (*getMonitorFromCursorFn)(CCompositor*);
+typedef Vector2D (*positionFn)(Pointer::CPointerManager*);
+using getMonitorFromCursorFn = PHLMONITOR (*)(CCompositor*);
 
 // --- Scroll/zoom hook ---
 
@@ -59,7 +59,7 @@ static void hkOnMouseWheel(CInputManager* self, IPointer::SAxisEvent e, SP<IPoin
 
             // Get raw screen coords (bypass our canvas-space hook)
             auto rawPos = (positionFn)g_pCanvas->m_positionHook->m_original;
-            const auto cursorScreen = rawPos(g_pPointerManager.get());
+            const auto cursorScreen = rawPos(Pointer::CPointerManager::get());
             g_pCanvas->applyZoom(newZoom, cursorScreen);
 
             logf("[hypr-canvas] zoom=%.3f offset=(%.1f, %.1f)\n",
@@ -128,7 +128,7 @@ static void hkOnMouseMoved(CInputManager* self, IPointer::SMotionEvent e) {
 // --- Cursor coordinate hook ---
 // position() has 16 call sites including mouseMoveUnified (window finding + surface-local coords)
 
-static Vector2D hkPosition(CPointerManager* self) {
+static Vector2D hkPosition(Pointer::CPointerManager* self) {
     auto original = (positionFn)g_pCanvas->m_positionHook->m_original;
     Vector2D raw = original(self);
 
@@ -143,9 +143,9 @@ static Vector2D hkPosition(CPointerManager* self) {
 // from reaching canvas positions outside the physical monitor. When zoomed,
 // disable clamping so m_pointerPos can hold any canvas-space position.
 
-typedef Vector2D (*closestValidFn)(CPointerManager*, const Vector2D&);
+typedef Vector2D (*closestValidFn)(Pointer::CPointerManager*, const Vector2D&);
 
-static Vector2D hkClosestValid(CPointerManager* self, const Vector2D& pos) {
+static Vector2D hkClosestValid(Pointer::CPointerManager* self, const Vector2D& pos) {
     if (g_pCanvas && g_pCanvas->isTransformed())
         return pos;
 
@@ -316,8 +316,8 @@ CCanvas::CCanvas() {
     {
         auto fns = HyprlandAPI::findFunctionsByName(PHANDLE, std::string("position"));
         for (auto& fn : fns) {
-            if (fn.demangled.find("CPointerManager") != std::string::npos) {
-                logf("[hypr-canvas] found CPointerManager::position() @ %p\n", fn.address);
+            if (fn.demangled.find("Pointer::CPointerManager") != std::string::npos) {
+                logf("[hypr-canvas] found Pointer::CPointerManager::position() @ %p\n", fn.address);
                 m_positionHook = HyprlandAPI::createFunctionHook(PHANDLE, fn.address, (void*)&hkPosition);
                 if (m_positionHook) m_positionHook->hook();
                 break;
@@ -333,7 +333,7 @@ CCanvas::CCanvas() {
         auto fns = HyprlandAPI::findFunctionsByName(PHANDLE, std::string("shouldRenderWindow"));
         for (auto& fn : fns) {
             // Match the 2-arg overload (PHLWINDOW, PHLMONITOR)
-            if (fn.demangled.find("CMonitor") != std::string::npos) {
+            if (fn.demangled.find("Monitor::CMonitor") != std::string::npos) {
                 logf("[hypr-canvas] found shouldRenderWindow(window,monitor) @ %p\n", fn.address);
                 m_shouldRenderHook = HyprlandAPI::createFunctionHook(PHANDLE, fn.address, (void*)&hkShouldRenderWindow);
                 if (m_shouldRenderHook) m_shouldRenderHook->hook();
@@ -406,3 +406,4 @@ void CCanvas::applyZoom(double newZoom, const Vector2D& anchorScreen) {
     zoom = std::clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
     offset = anchorCanvas - anchorScreen / zoom;
 }
+
