@@ -39,7 +39,7 @@ using PHLWORKSPACE = SP<CWorkspace>;
 using PHLWINDOW    = SP<Desktop::View::CWindow>;
 using steady_tp    = std::chrono::steady_clock::time_point;
 typedef Vector2D (*positionFn)(Pointer::CPointerManager*);
-using getMonitorFromCursorFn = PHLMONITOR (*)(Render::CCompositor*);
+using getMonitorFromCursorFn = PHLMONITOR (*)(CCompositor*);
 
 // --- Scroll/zoom hook ---
 
